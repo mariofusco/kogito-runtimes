@@ -7,10 +7,6 @@
     </parent>
     <artifactId>integration-tests-kogito-plugin-it</artifactId>
 
-    <properties>
-        <kogito.codegen.sources.directory>src/main/generated</kogito.codegen.sources.directory>
-    </properties>
-
     <dependencyManagement>
         <dependencies>
             <dependency>
@@ -73,9 +69,7 @@
                 <artifactId>quarkus-maven-plugin</artifactId>
                 <executions>
                     <execution>
-                        <goals>
-                            <goal>build</goal>
-                        </goals>
+                        <phase>none</phase>
                     </execution>
                 </executions>
             </plugin>
