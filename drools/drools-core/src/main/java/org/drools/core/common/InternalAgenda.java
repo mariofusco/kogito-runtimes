@@ -264,6 +264,8 @@ public interface InternalAgenda
 
     void evaluateEagerList();
 
+    void evaluateQueriesForRule(RuleAgendaItem item);
+
     Map<String,InternalActivationGroup> getActivationGroupsMap();
 
     InternalAgendaGroup getNextFocus();

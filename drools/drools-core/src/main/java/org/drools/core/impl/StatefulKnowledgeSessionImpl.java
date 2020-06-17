@@ -153,6 +153,7 @@ import org.kie.internal.process.CorrelationKey;
 import org.kie.internal.runtime.StatefulKnowledgeSession;
 import org.kie.kogito.Application;
 import org.kie.kogito.jobs.JobsService;
+import org.kie.kogito.rules.DataSource;
 import org.kie.services.time.TimerService;
 
 import static java.util.stream.Collectors.toList;
@@ -2317,13 +2318,26 @@ public class StatefulKnowledgeSessionImpl extends AbstractRuntime
     }
 
 
+    ///////////////////////////////////////////////////////////////////////////
+    // End of utility methods used by droolsjbpm-tools
+    ///////////////////////////////////////////////////////////////////////////
+
     @Override
     public JobsService getJobsService() {
         return null;
     }
 
-    ///////////////////////////////////////////////////////////////////////////
-    // End of utility methods used by droolsjbpm-tools
-    ///////////////////////////////////////////////////////////////////////////
-
+    @Override
+    public void bindUnitField( Object field, String name, boolean isDataSource ) {
+        if ( isDataSource ) {
+            DataSource<?> o = ( DataSource<?> ) field;
+            EntryPoint ep = getEntryPoint(name);
+            o.subscribe(new EntryPointDataProcessor( ep ));
+        }
+        try {
+            setGlobal( name, field );
+        } catch (RuntimeException e) {
+            // ignore if the global doesn't exist
+        }
+    }
 }

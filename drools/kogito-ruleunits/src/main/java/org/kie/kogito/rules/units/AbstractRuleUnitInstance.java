@@ -19,21 +19,20 @@ import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
 
-import org.kie.api.runtime.KieSession;
-import org.kie.api.runtime.rule.EntryPoint;
+import org.kie.api.runtime.rule.UnitRuntime;
 import org.kie.api.time.SessionClock;
 import org.kie.kogito.rules.DataSource;
 import org.kie.kogito.rules.RuleUnit;
-import org.kie.kogito.rules.RuleUnitInstance;
 import org.kie.kogito.rules.RuleUnitData;
+import org.kie.kogito.rules.RuleUnitInstance;
 
 public class AbstractRuleUnitInstance<T extends RuleUnitData> implements RuleUnitInstance<T> {
 
     private final T unitMemory;
     private final RuleUnit<T> unit;
-    private final KieSession runtime;
+    private final UnitRuntime runtime;
 
-    public AbstractRuleUnitInstance( RuleUnit<T> unit, T unitMemory, KieSession runtime ) {
+    public AbstractRuleUnitInstance( RuleUnit<T> unit, T unitMemory, UnitRuntime runtime ) {
         this.unit = unit;
         this.runtime = runtime;
         this.unitMemory = unitMemory;
@@ -63,24 +62,12 @@ public class AbstractRuleUnitInstance<T extends RuleUnitData> implements RuleUni
         return unitMemory;
     }
 
-    protected void bind(KieSession runtime, T workingMemory) {
+    protected void bind(UnitRuntime runtime, T unitMemory) {
         try {
-            for (Field f : workingMemory.getClass().getDeclaredFields()) {
+            for (Field f : unitMemory.getClass().getDeclaredFields()) {
                 f.setAccessible(true);
-                Object v = null;
-                v = f.get(workingMemory);
-                String dataSourceName = String.format(
-                        "%s.%s", workingMemory.getClass().getCanonicalName(), f.getName());
-                if ( v instanceof DataSource ) {
-                    DataSource<?> o = ( DataSource<?> ) v;
-                    EntryPoint ep = runtime.getEntryPoint(dataSourceName);
-                    o.subscribe(new EntryPointDataProcessor( ep ));
-                }
-                try {
-                    runtime.setGlobal( dataSourceName, v );
-                } catch (RuntimeException e) {
-                    // ignore if the global doesn't exist
-                }
+                Object value = f.get(unitMemory);
+                runtime.bindUnitField( value, f.getName(), value instanceof DataSource );
             }
         } catch (IllegalAccessException e) {
             throw new Error(e);

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.kie.kogito.rules.units;
+package org.drools.core.impl;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -28,9 +28,8 @@ import org.drools.core.util.bitmask.BitMask;
 import org.kie.api.runtime.rule.EntryPoint;
 import org.kie.api.runtime.rule.FactHandle;
 import org.kie.kogito.rules.DataHandle;
-import org.kie.kogito.rules.DataProcessor;
 
-public class EntryPointDataProcessor implements DataProcessor {
+public class EntryPointDataProcessor implements InternalDataProcessor {
     private final EntryPoint entryPoint;
 
     private final Map<DataHandle, InternalFactHandle> handles = new HashMap<>();
@@ -48,10 +47,12 @@ public class EntryPointDataProcessor implements DataProcessor {
         return fh;
     }
 
+    @Override
     public void update( DataHandle dh, Object obj, BitMask mask, Class<?> modifiedClass, Activation activation) {
         update( handles.get(dh), obj, mask, modifiedClass, activation );
     }
 
+    @Override
     public void update( InternalFactHandle fh, Object obj, BitMask mask, Class<?> modifiedClass, Activation activation) {
         (( WorkingMemoryEntryPoint ) entryPoint).update( fh, obj, mask, modifiedClass, activation );
     }
@@ -66,10 +67,12 @@ public class EntryPointDataProcessor implements DataProcessor {
         entryPoint.delete( handles.remove(handle) );
     }
 
+    @Override
     public void delete(DataHandle dh, RuleImpl rule, TerminalNode terminalNode, FactHandle.State fhState) {
         delete( handles.get(dh), rule, terminalNode, fhState );
     }
 
+    @Override
     public void delete(InternalFactHandle fh, RuleImpl rule, TerminalNode terminalNode, FactHandle.State fhState) {
         (( WorkingMemoryEntryPoint ) entryPoint).delete( fh, rule, terminalNode, fhState );
         handles.remove( fh.getDataHandle() );

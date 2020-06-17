@@ -548,6 +548,11 @@ public class CompositeDefaultAgenda implements Externalizable, InternalAgenda {
     }
 
     @Override
+    public void evaluateQueriesForRule(RuleAgendaItem item) {
+        throw new UnsupportedOperationException( "org.drools.core.common.CompositeDefaultAgenda.evaluateQueriesForRule -> TODO" );
+    }
+
+    @Override
     public Map<String, InternalActivationGroup> getActivationGroupsMap() {
         throw new UnsupportedOperationException( "org.drools.core.common.CompositeDefaultAgenda.getActivationGroupsMap -> TODO" );
     }

@@ -22,6 +22,7 @@ import java.util.Map;
 
 import org.drools.core.common.InternalFactHandle;
 import org.drools.core.definitions.rule.impl.RuleImpl;
+import org.drools.core.impl.InternalDataProcessor;
 import org.drools.core.reteoo.TerminalNode;
 import org.drools.core.ruleunit.InternalStoreCallback;
 import org.drools.core.spi.Activation;
@@ -36,20 +37,20 @@ public class ListDataStore<T> implements DataStore<T>,
                                          InternalStoreCallback {
     private final Map<Object, DataHandle> store = new IdentityHashMap<>();
 
-    private final List<EntryPointDataProcessor> entryPointSubscribers = new ArrayList<>();
+    private final List<InternalDataProcessor> internalSubscribers = new ArrayList<>();
     private final List<DataProcessor<T>> subscribers = new ArrayList<>();
 
     public DataHandle add(T t) {
         DataHandle dh = new DataHandleImpl( t );
         store.put(t, dh);
-        entryPointSubscribers.forEach( s -> internalInsert( dh, s ) );
+        internalSubscribers.forEach( s -> internalInsert( dh, s ) );
         subscribers.forEach( s -> internalInsert( dh, s ) );
         return dh;
     }
 
     @Override
     public void update(DataHandle handle, T object) {
-        entryPointSubscribers.forEach( s -> s.update( handle, handle.getObject() ) );
+        internalSubscribers.forEach( s -> s.update( handle, handle.getObject() ) );
         subscribers.forEach( s -> s.update( handle, object ) );
     }
 
@@ -60,16 +61,16 @@ public class ListDataStore<T> implements DataStore<T>,
 
     @Override
     public void remove(DataHandle handle) {
-        entryPointSubscribers.forEach( s -> s.delete( handle ) );
+        internalSubscribers.forEach( s -> s.delete( handle ) );
         subscribers.forEach( s -> s.delete( handle ) );
         store.remove( handle.getObject() );
     }
 
     @Override
     public void subscribe(DataProcessor processor) {
-        if (processor instanceof EntryPointDataProcessor) {
-            EntryPointDataProcessor subscriber = (EntryPointDataProcessor) processor;
-            entryPointSubscribers.add(subscriber);
+        if (processor instanceof InternalDataProcessor) {
+            InternalDataProcessor subscriber = (InternalDataProcessor) processor;
+            internalSubscribers.add(subscriber);
         } else {
             subscribers.add(processor);
         }
@@ -79,14 +80,14 @@ public class ListDataStore<T> implements DataStore<T>,
     @Override
     public void update( InternalFactHandle fh, Object obj, BitMask mask, Class<?> modifiedClass, Activation activation) {
         DataHandle dh = fh.getDataHandle();
-        entryPointSubscribers.forEach( s -> s.update( dh, obj, mask, modifiedClass, activation ) );
+        internalSubscribers.forEach( s -> s.update( dh, obj, mask, modifiedClass, activation ) );
         subscribers.forEach( s -> s.update(dh, (T) obj) );
     }
 
     @Override
     public void delete( InternalFactHandle fh, RuleImpl rule, TerminalNode terminalNode, FactHandle.State fhState) {
         DataHandle dh = fh.getDataHandle();
-        entryPointSubscribers.forEach( s -> s.delete( dh, rule, terminalNode, fhState ) );
+        internalSubscribers.forEach( s -> s.delete( dh, rule, terminalNode, fhState ) );
         subscribers.forEach( s -> s.delete(dh) );
         store.remove( fh.getObject() );
     }

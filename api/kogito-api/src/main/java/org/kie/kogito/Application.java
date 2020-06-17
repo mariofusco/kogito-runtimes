@@ -50,7 +50,7 @@ public interface Application {
     default RuleUnits ruleUnits() {
         return null;
     }
-    
+
     /**
      * Returns decision models found in the application otherwise null
      * @return decision models or null if not found

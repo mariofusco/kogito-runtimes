@@ -17,23 +17,22 @@ package org.kie.kogito.codegen.rules;
 
 import java.lang.reflect.Field;
 
-import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Modifier;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.expr.BinaryExpr;
+import com.github.javaparser.ast.expr.BooleanLiteralExpr;
 import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.ast.expr.NameExpr;
 import com.github.javaparser.ast.expr.NullLiteralExpr;
-import com.github.javaparser.ast.expr.ObjectCreationExpr;
 import com.github.javaparser.ast.expr.StringLiteralExpr;
 import com.github.javaparser.ast.stmt.BlockStmt;
 import com.github.javaparser.ast.stmt.IfStmt;
 import com.github.javaparser.ast.type.ClassOrInterfaceType;
-import org.kie.api.runtime.KieSession;
+import org.kie.api.runtime.rule.UnitRuntime;
 import org.kie.internal.ruleunit.RuleUnitDescription;
 import org.kie.internal.ruleunit.RuleUnitVariable;
 import org.kie.kogito.codegen.BodyDeclarationComparator;
@@ -42,7 +41,6 @@ import org.kie.kogito.conf.DefaultEntryPoint;
 import org.kie.kogito.conf.EntryPoint;
 import org.kie.kogito.rules.DataSource;
 import org.kie.kogito.rules.units.AbstractRuleUnitInstance;
-import org.kie.kogito.rules.units.EntryPointDataProcessor;
 
 public class RuleUnitInstanceGenerator implements FileGenerator {
 
@@ -87,7 +85,7 @@ public class RuleUnitInstanceGenerator implements FileGenerator {
         methodDeclaration.setName("bind")
                 .addAnnotation( "Override" )
                 .addModifier(Modifier.Keyword.PROTECTED)
-                .addParameter(KieSession.class.getCanonicalName(), "runtime")
+                .addParameter(UnitRuntime.class.getCanonicalName(), "runtime")
                 .addParameter(ruleUnitDescription.getRuleUnitName(), "value")
                 .setType(void.class)
                 .setBody(methodBlock);
@@ -100,34 +98,19 @@ public class RuleUnitInstanceGenerator implements FileGenerator {
                 String propertyName = m.getName();
 
                 if ( m.isDataSource() ) {
-
                     if (m.setter() != null) { // if writable and DataSource is null create and set a new one
                         Expression nullCheck = new BinaryExpr(new MethodCallExpr(new NameExpr("value"), methodName), new NullLiteralExpr(), BinaryExpr.Operator.EQUALS);
                         Expression createDataSourceExpr = new MethodCallExpr(new NameExpr(DataSource.class.getCanonicalName()), ruleUnitHelper.createDataSourceMethodName(m.getBoxedVarType()));
                         Expression dataSourceSetter = new MethodCallExpr(new NameExpr("value"), m.setter(), new NodeList<>(createDataSourceExpr));
                         methodBlock.addStatement( new IfStmt( nullCheck, new BlockStmt().addStatement( dataSourceSetter ), null ) );
                     }
-
-                    //  value.$method())
-                    Expression fieldAccessor =
-                            new MethodCallExpr(new NameExpr("value"), methodName);
-
-                    // .subscribe( new EntryPointDataProcessor(runtime.getEntryPoint()) )
-
-                    String entryPointName = getEntryPointName(ruleUnitDescription, propertyName);
-                    MethodCallExpr drainInto = new MethodCallExpr(fieldAccessor, "subscribe")
-                            .addArgument(new ObjectCreationExpr(null, StaticJavaParser.parseClassOrInterfaceType( EntryPointDataProcessor.class.getName() ), NodeList.nodeList(
-                                    new MethodCallExpr(
-                                            new NameExpr("runtime"), "getEntryPoint",
-                                            NodeList.nodeList(new StringLiteralExpr( entryPointName ))))));
-
-                    methodBlock.addStatement(drainInto);
                 }
 
-                MethodCallExpr setGlobalCall = new MethodCallExpr( new NameExpr("runtime"), "setGlobal" );
-                setGlobalCall.addArgument( new StringLiteralExpr( propertyName ) );
-                setGlobalCall.addArgument( new MethodCallExpr(new NameExpr("value"), methodName) );
-                methodBlock.addStatement(setGlobalCall);
+                MethodCallExpr bindMethod = new MethodCallExpr(new NameExpr("runtime"), "bindUnitField");
+                bindMethod.addArgument( new MethodCallExpr(new NameExpr("value"), methodName) );
+                bindMethod.addArgument( new StringLiteralExpr( propertyName ) );
+                bindMethod.addArgument( new BooleanLiteralExpr( m.isDataSource() ) );
+                methodBlock.addStatement(bindMethod);
             }
 
         } catch (Exception e) {
@@ -168,12 +151,12 @@ public class RuleUnitInstanceGenerator implements FileGenerator {
                 .addConstructor(Modifier.Keyword.PUBLIC)
                 .addParameter(RuleUnitGenerator.ruleUnitType(canonicalName), "unit")
                 .addParameter(canonicalName, "value")
-                .addParameter(KieSession.class.getCanonicalName(), "session")
+                .addParameter(UnitRuntime.class.getCanonicalName(), "runtime")
                 .setBody(new BlockStmt().addStatement(new MethodCallExpr(
                         "super",
                         new NameExpr("unit"),
                         new NameExpr("value"),
-                        new NameExpr("session")
+                        new NameExpr("runtime")
                 )));
         classDecl.addMember(bindMethod());
         classDecl.getMembers().sort(new BodyDeclarationComparator());

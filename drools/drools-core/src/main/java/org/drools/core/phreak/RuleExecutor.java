@@ -228,7 +228,7 @@ public class RuleExecutor {
             return true;
         }
 
-        if (rule.getCalendars() != null) {
+        if (rule.getCalendars() != null && rule.getCalendars().length > 0) {
             long timestamp = wm.getSessionClock().getCurrentTime();
             for (String cal : rule.getCalendars()) {
                 if (!wm.getCalendars().get(cal).isTimeIncluded(timestamp)) {

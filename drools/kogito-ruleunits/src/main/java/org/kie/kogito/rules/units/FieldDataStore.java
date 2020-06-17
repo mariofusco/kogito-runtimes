@@ -20,6 +20,7 @@ import java.util.List;
 
 import org.drools.core.common.InternalFactHandle;
 import org.drools.core.definitions.rule.impl.RuleImpl;
+import org.drools.core.impl.InternalDataProcessor;
 import org.drools.core.reteoo.TerminalNode;
 import org.drools.core.ruleunit.InternalStoreCallback;
 import org.drools.core.spi.Activation;
@@ -35,7 +36,7 @@ public class FieldDataStore<T> implements SingletonStore<T>,
 
     private DataHandleImpl handle = null;
 
-    private final List<EntryPointDataProcessor> entryPointSubscribers = new ArrayList<>();
+    private final List<InternalDataProcessor> internalSubscribers = new ArrayList<>();
     private final List<DataProcessor<T>> subscribers = new ArrayList<>();
 
     public DataHandle set(T t) {
@@ -53,7 +54,7 @@ public class FieldDataStore<T> implements SingletonStore<T>,
 
     private void insert(T t) {
         handle = new DataHandleImpl(t);
-        entryPointSubscribers.forEach(s -> internalInsert(handle, s));
+        internalSubscribers.forEach( s -> internalInsert(handle, s));
         subscribers.forEach(s -> internalInsert(handle, s));
     }
 
@@ -62,7 +63,7 @@ public class FieldDataStore<T> implements SingletonStore<T>,
             return;
         }
         DataHandle dh = handle;
-        entryPointSubscribers.forEach(s -> s.update(dh, dh.getObject()));
+        internalSubscribers.forEach( s -> s.update(dh, dh.getObject()));
         subscribers.forEach(s -> s.update(dh, (T) dh.getObject()));
     }
 
@@ -73,15 +74,15 @@ public class FieldDataStore<T> implements SingletonStore<T>,
         }
         DataHandle dh = handle;
         handle = null;
-        entryPointSubscribers.forEach(s -> s.delete(dh));
+        internalSubscribers.forEach( s -> s.delete(dh));
         subscribers.forEach(s -> s.delete(dh));
     }
 
     @Override
     public void subscribe(DataProcessor processor) {
-        if (processor instanceof EntryPointDataProcessor) {
-            EntryPointDataProcessor subscriber = (EntryPointDataProcessor) processor;
-            entryPointSubscribers.add(subscriber);
+        if (processor instanceof InternalDataProcessor) {
+            InternalDataProcessor subscriber = (InternalDataProcessor) processor;
+            internalSubscribers.add(subscriber);
         } else {
             subscribers.add(processor);
         }
@@ -93,7 +94,7 @@ public class FieldDataStore<T> implements SingletonStore<T>,
     @Override
     public void update(InternalFactHandle fh, Object obj, BitMask mask, Class<?> modifiedClass, Activation activation) {
         DataHandle dh = fh.getDataHandle();
-        entryPointSubscribers.forEach(s -> s.update(dh, obj, mask, modifiedClass, activation));
+        internalSubscribers.forEach( s -> s.update(dh, obj, mask, modifiedClass, activation));
         subscribers.forEach(s -> s.update(dh, (T) obj));
     }
 
@@ -103,7 +104,7 @@ public class FieldDataStore<T> implements SingletonStore<T>,
         if (dh != this.handle) {
             throw new IllegalArgumentException("The given handle is not contained in this DataStore");
         }
-        entryPointSubscribers.forEach(s -> s.delete(dh, rule, terminalNode, fhState));
+        internalSubscribers.forEach( s -> s.delete(dh, rule, terminalNode, fhState));
         subscribers.forEach(s -> s.delete(dh));
         handle = null;
     }

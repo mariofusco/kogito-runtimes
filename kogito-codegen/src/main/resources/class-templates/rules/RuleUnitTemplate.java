@@ -1,6 +1,7 @@
 package $Package$;
 
 import org.kie.api.runtime.KieSession;
+import org.kie.api.runtime.rule.UnitRuntime;
 import org.kie.kogito.rules.RuleEventListenerConfig;
 import org.kie.kogito.rules.units.impl.AbstractRuleUnit;
 
@@ -15,7 +16,7 @@ public class $Name$ extends AbstractRuleUnit<$ModelName$> {
     }
 
     public $InstanceName$ internalCreateInstance($ModelName$ value) {
-        return new $InstanceName$( this, value, createLegacySession());
+        return new $InstanceName$( this, value, createUnitRuntime());
     }
 
     private KieSession createLegacySession() {
@@ -27,5 +28,16 @@ public class $Name$ extends AbstractRuleUnit<$ModelName$> {
             ruleEventListenerConfig.ruleRuntimeListeners().forEach(ks::addEventListener);
         }
         return ks;
+    }
+
+    private UnitRuntime createUnitRuntime() {
+        UnitRuntime runtime = app.ruleUnits().ruleRuntimeBuilder().newUnitRuntime( app, $ModelClass$ );
+//        org.drools.core.common.InternalWorkingMemory wm = (org.drools.core.common.InternalWorkingMemory) runtime;
+//        if (app.config() != null && app.config().rule() != null) {
+//            RuleEventListenerConfig ruleEventListenerConfig = app.config().rule().ruleEventListeners();
+//            ruleEventListenerConfig.agendaListeners().forEach(wm::addEventListener);
+//            ruleEventListenerConfig.ruleRuntimeListeners().forEach(wm::addEventListener);
+//        }
+        return runtime;
     }
 }
