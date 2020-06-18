@@ -70,6 +70,7 @@ import org.drools.core.spi.AsyncExceptionHandler;
 import org.drools.core.spi.FactHandleFactory;
 import org.drools.core.spi.GlobalResolver;
 import org.drools.core.spi.PropagationContext;
+import org.drools.core.time.TimerServiceFactory;
 import org.drools.core.util.bitmask.BitMask;
 import org.kie.api.KieBase;
 import org.kie.api.event.kiebase.KieBaseEventListener;
@@ -110,7 +111,7 @@ public class UnitRuntimeImpl implements UnitRuntime {
         this.kBase = kBase;
         this.config = config;
         kBase.getConfiguration().getComponentFactory().setKnowledgeHelperFactory(new UnitKnowledgeHelperFactory());
-        this.workingMemory = new WorkingMemoryAdapter( this );
+        this.workingMemory = new WorkingMemoryAdapter( this, config );
     }
 
     @Override
@@ -164,12 +165,15 @@ public class UnitRuntimeImpl implements UnitRuntime {
 
         private final PropagationContextFactory pctxFactory;
 
-        private WorkingMemoryAdapter( UnitRuntimeImpl runtime ) {
+        private final TimerService timerService;
+
+        private WorkingMemoryAdapter( UnitRuntimeImpl runtime, SessionConfiguration config ) {
             this.runtime = runtime;
             this.handleFactory = runtime.kBase.newFactHandleFactory();
             this.nodeMemories = new ConcurrentNodeMemories(runtime.kBase, DEFAULT_RULE_UNIT);
             this.pctxFactory = runtime.kBase.getConfiguration().getComponentFactory().getPropagationContextFactory();
             this.agenda = new UnitAgenda( runtime.kBase, this );
+            this.timerService = TimerServiceFactory.getTimerService( config );
         }
 
         @Override
@@ -374,7 +378,7 @@ public class UnitRuntimeImpl implements UnitRuntime {
 
         @Override
         public SessionClock getSessionClock() {
-            throw new UnsupportedOperationException();
+            return (SessionClock) this.timerService;
         }
 
         @Override
@@ -403,14 +407,12 @@ public class UnitRuntimeImpl implements UnitRuntime {
 
         @Override
         public Object getGlobal( String identifier ) {
-            throw new UnsupportedOperationException( "org.kie.kogito.rules.units.impl.UnitRuntimeImpl.WorkingMemoryAdapter.getGlobal -> TODO" );
-
+            return this.globalResolver.resolveGlobal( identifier );
         }
 
         @Override
         public Globals getGlobals() {
-            throw new UnsupportedOperationException( "org.kie.kogito.rules.units.impl.UnitRuntimeImpl.WorkingMemoryAdapter.getGlobals -> TODO" );
-
+            return (Globals) this.getGlobalResolver();
         }
 
         @Override
@@ -985,8 +987,9 @@ public class UnitRuntimeImpl implements UnitRuntime {
 
         @Override
         public void cancelActivation( Activation activation, boolean declarativeAgenda ) {
-            throw new UnsupportedOperationException( "org.kie.kogito.rules.units.impl.UnitRuntimeImpl.WorkingMemoryAdapter.cancelActivation -> TODO" );
-
+            if (declarativeAgenda) {
+                throw new UnsupportedOperationException( "org.kie.kogito.rules.units.impl.UnitRuntimeImpl.WorkingMemoryAdapter.cancelActivation -> TODO" );
+            }
         }
 
         @Override

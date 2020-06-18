@@ -21,7 +21,6 @@ import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.drools.core.RuleBaseConfiguration;
-import org.drools.core.WorkingMemoryEntryPoint;
 import org.drools.core.common.ClassAwareObjectStore;
 import org.drools.core.common.InternalFactHandle;
 import org.drools.core.common.InternalWorkingMemory;
@@ -61,6 +60,8 @@ public class EntryPointNodeDataProcessor implements InternalDataProcessor {
         this.pctxFactory = epNode.getKnowledgeBase().getConfiguration().getComponentFactory().getPropagationContextFactory();
     }
 
+    // -- Insert --------------
+
     @Override
     public FactHandle insert(DataHandle handle, Object object) {
         InternalFactHandle fh = internalInsert( object );
@@ -68,35 +69,6 @@ public class EntryPointNodeDataProcessor implements InternalDataProcessor {
             handles.put( handle, fh );
         }
         return fh;
-    }
-
-    @Override
-    public void update( DataHandle dh, Object obj, BitMask mask, Class<?> modifiedClass, Activation activation) {
-        update( handles.get(dh), obj, mask, modifiedClass, activation );
-    }
-
-    @Override
-    public void update( InternalFactHandle fh, Object obj, BitMask mask, Class<?> modifiedClass, Activation activation) {
-        internalUpdate( fh, obj, mask, modifiedClass, activation );
-    }
-
-    @Override
-    public void update(DataHandle handle, Object object) {
-        internalUpdate( handles.get(handle), object, allSetBitMask(), Object.class, null );
-    }
-
-    @Override
-    public void delete(DataHandle handle) {
-        entryPoint.delete( handles.remove(handle) );
-    }
-
-    public void delete(DataHandle dh, RuleImpl rule, TerminalNode terminalNode, FactHandle.State fhState) {
-        delete( handles.get(dh), rule, terminalNode, fhState );
-    }
-
-    public void delete(InternalFactHandle fh, RuleImpl rule, TerminalNode terminalNode, FactHandle.State fhState) {
-        (( WorkingMemoryEntryPoint ) entryPoint).delete( fh, rule, terminalNode, fhState );
-        handles.remove( fh.getDataHandle() );
     }
 
     private InternalFactHandle internalInsert(Object object) {
@@ -138,9 +110,25 @@ public class EntryPointNodeDataProcessor implements InternalDataProcessor {
         workingMemory.getRuleRuntimeEventSupport().fireObjectInserted(pctx, handle, object, workingMemory);
     }
 
-    private InternalFactHandle createHandle(final Object object,
-                                            ObjectTypeConf typeConf) {
+    private InternalFactHandle createHandle(Object object, ObjectTypeConf typeConf) {
         return workingMemory.getFactHandleFactory().newFactHandle( object, typeConf, workingMemory, null );
+    }
+
+    // -- Update --------------
+
+    @Override
+    public void update( DataHandle dh, Object obj, BitMask mask, Class<?> modifiedClass, Activation activation) {
+        update( handles.get(dh), obj, mask, modifiedClass, activation );
+    }
+
+    @Override
+    public void update( InternalFactHandle fh, Object obj, BitMask mask, Class<?> modifiedClass, Activation activation) {
+        internalUpdate( fh, obj, mask, modifiedClass, activation );
+    }
+
+    @Override
+    public void update(DataHandle handle, Object object) {
+        internalUpdate( handles.get(handle), object, allSetBitMask(), Object.class, null );
     }
 
     private InternalFactHandle internalUpdate(InternalFactHandle handle, Object object, BitMask mask, Class<?> modifiedClass, Activation activation) {
@@ -175,8 +163,61 @@ public class EntryPointNodeDataProcessor implements InternalDataProcessor {
         return handle;
     }
 
-    public void internalUpdate(InternalFactHandle handle, Object object, Object originalObject, ObjectTypeConf typeConf, PropagationContext propagationContext) {
+    private void internalUpdate(InternalFactHandle handle, Object object, Object originalObject, ObjectTypeConf typeConf, PropagationContext propagationContext) {
         epNode.modifyObject( handle, propagationContext, typeConf, workingMemory );
         workingMemory.getRuleRuntimeEventSupport().fireObjectUpdated(propagationContext, handle, originalObject, object, workingMemory);
+    }
+
+    // -- Delete --------------
+
+    @Override
+    public void delete(DataHandle handle) {
+        internalDelete(handles.remove(handle), null, null);
+    }
+
+    @Override
+    public void delete(DataHandle dh, RuleImpl rule, TerminalNode terminalNode, FactHandle.State fhState) {
+        internalDelete( handles.remove(dh), rule, terminalNode );
+    }
+
+    @Override
+    public void delete(InternalFactHandle fh, RuleImpl rule, TerminalNode terminalNode, FactHandle.State fhState) {
+        internalDelete( fh, rule, terminalNode );
+        handles.remove( fh.getDataHandle() );
+    }
+
+    private void internalDelete(FactHandle factHandle, RuleImpl rule, TerminalNode terminalNode) {
+        if ( factHandle == null ) {
+            throw new IllegalArgumentException( "FactHandle cannot be null " );
+        }
+
+        this.lock.lock();
+        try {
+            epNode.getKnowledgeBase().executeQueuedActions();
+
+            InternalFactHandle handle = (InternalFactHandle) factHandle;
+
+            if (handle.getId() == -1) {
+                // can't retract an already retracted handle
+                return;
+            }
+
+            // the handle might have been disconnected, so reconnect if it has
+            if (handle.isDisconnected()) {
+                handle = this.objectStore.reconnect(handle);
+            }
+
+            Object object = handle.getObject();
+            ObjectTypeConf typeConf = epNode.getTypeConfReg().getObjectTypeConf( epNode.getEntryPoint(), object );
+
+            PropagationContext propagationContext = pctxFactory.createPropagationContext( workingMemory.getNextPropagationIdCounter(), PropagationContext.Type.DELETION,
+                    rule, terminalNode, handle, epNode.getEntryPoint() );
+            epNode.retractObject( handle, propagationContext, typeConf, workingMemory );
+            objectStore.removeHandle( handle );
+            workingMemory.getRuleRuntimeEventSupport().fireObjectRetracted(propagationContext, handle, object, workingMemory);
+            workingMemory.getFactHandleFactory().destroyFactHandle( handle );
+        } finally {
+            this.lock.unlock();
+        }
     }
 }
