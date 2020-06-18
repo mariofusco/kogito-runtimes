@@ -2328,14 +2328,14 @@ public class StatefulKnowledgeSessionImpl extends AbstractRuntime
     }
 
     @Override
-    public void bindUnitField( Object field, String name, boolean isDataSource ) {
+    public void bindUnitField( Object field, String fieldName, String entryPointName, boolean isDataSource ) {
         if ( isDataSource ) {
             DataSource<?> o = ( DataSource<?> ) field;
-            EntryPoint ep = getEntryPoint(name);
+            EntryPoint ep = getEntryPoint(entryPointName);
             o.subscribe(new EntryPointDataProcessor( ep ));
         }
         try {
-            setGlobal( name, field );
+            setGlobal( fieldName, field );
         } catch (RuntimeException e) {
             // ignore if the global doesn't exist
         }

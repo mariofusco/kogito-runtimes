@@ -31,13 +31,6 @@ public class $Name$ extends AbstractRuleUnit<$ModelName$> {
     }
 
     private UnitRuntime createUnitRuntime() {
-        UnitRuntime runtime = app.ruleUnits().ruleRuntimeBuilder().newUnitRuntime( app, $ModelClass$ );
-//        org.drools.core.common.InternalWorkingMemory wm = (org.drools.core.common.InternalWorkingMemory) runtime;
-//        if (app.config() != null && app.config().rule() != null) {
-//            RuleEventListenerConfig ruleEventListenerConfig = app.config().rule().ruleEventListeners();
-//            ruleEventListenerConfig.agendaListeners().forEach(wm::addEventListener);
-//            ruleEventListenerConfig.ruleRuntimeListeners().forEach(wm::addEventListener);
-//        }
-        return runtime;
+        return app.ruleUnits().ruleRuntimeBuilder().newUnitRuntime( app, $ModelClass$ );
     }
 }

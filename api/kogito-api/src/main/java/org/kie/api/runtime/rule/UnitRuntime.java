@@ -25,5 +25,5 @@ public interface UnitRuntime {
 
     <T extends SessionClock> T getSessionClock();
 
-    default void bindUnitField( Object field, String name, boolean isDataSource ) { }
+    default void bindUnitField( Object field, String fieldName, String entryPointName, boolean isDataSource ) { }
 }

@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.drools.core.InitialFact;
 import org.drools.core.QueryResultsImpl;
 import org.drools.core.SessionConfiguration;
 import org.drools.core.WorkingMemoryEntryPoint;
@@ -34,6 +35,7 @@ import org.drools.core.base.NonCloningQueryViewListener;
 import org.drools.core.base.QueryRowWithSubruleIndex;
 import org.drools.core.common.BaseNode;
 import org.drools.core.common.ConcurrentNodeMemories;
+import org.drools.core.common.DefaultFactHandle;
 import org.drools.core.common.EndOperationListener;
 import org.drools.core.common.InternalAgenda;
 import org.drools.core.common.InternalFactHandle;
@@ -56,9 +58,11 @@ import org.drools.core.phreak.PropagationEntry;
 import org.drools.core.phreak.RuleAgendaItem;
 import org.drools.core.phreak.SegmentUtilities;
 import org.drools.core.reteoo.EntryPointNode;
+import org.drools.core.reteoo.InitialFactImpl;
 import org.drools.core.reteoo.LeftInputAdapterNode;
 import org.drools.core.reteoo.LeftTupleSource;
 import org.drools.core.reteoo.NodeTypeEnums;
+import org.drools.core.reteoo.ObjectTypeNode;
 import org.drools.core.reteoo.PathMemory;
 import org.drools.core.reteoo.QueryTerminalNode;
 import org.drools.core.reteoo.TerminalNode;
@@ -96,33 +100,37 @@ import org.kie.api.time.SessionClock;
 import org.kie.kogito.Application;
 import org.kie.kogito.jobs.JobsService;
 import org.kie.kogito.rules.DataSource;
+import org.kie.kogito.rules.RuleEventListenerConfig;
 import org.kie.services.time.TimerService;
 
+import static org.drools.core.base.ClassObjectType.InitialFact_ObjectType;
 import static org.drools.core.impl.StatefulKnowledgeSessionImpl.DEFAULT_RULE_UNIT;
 
 public class UnitRuntimeImpl implements UnitRuntime {
 
     private final InternalKnowledgeBase kBase;
     private final SessionConfiguration config;
+    private final Application application;
 
     private final InternalWorkingMemory workingMemory;
 
     public UnitRuntimeImpl( Application application, InternalKnowledgeBase kBase, SessionConfiguration config ) {
         this.kBase = kBase;
         this.config = config;
+        this.application = application;
         kBase.getConfiguration().getComponentFactory().setKnowledgeHelperFactory(new UnitKnowledgeHelperFactory());
         this.workingMemory = new WorkingMemoryAdapter( this, config );
     }
 
     @Override
-    public void bindUnitField( Object field, String name, boolean isDataSource ) {
+    public void bindUnitField( Object field, String fieldName, String entryPointName, boolean isDataSource ) {
         if ( isDataSource ) {
             DataSource<?> o = ( DataSource<?> ) field;
-            EntryPointNode epNode = kBase.getRete().getEntryPointNode( new EntryPointId( name ) );
+            EntryPointNode epNode = kBase.getRete().getEntryPointNode( new EntryPointId( entryPointName ) );
             o.subscribe(new EntryPointNodeDataProcessor( epNode, workingMemory ));
         }
         try {
-            workingMemory.setGlobal( name, field );
+            workingMemory.setGlobal( fieldName, field );
         } catch (RuntimeException e) {
             // ignore if the global doesn't exist
         }
@@ -143,7 +151,7 @@ public class UnitRuntimeImpl implements UnitRuntime {
         return (T) workingMemory.getSessionClock();
     }
 
-    private static class WorkingMemoryAdapter implements InternalWorkingMemory, InternalKnowledgeRuntime {
+    public static class WorkingMemoryAdapter implements InternalWorkingMemory, InternalKnowledgeRuntime {
 
         private final UnitRuntimeImpl runtime;
 
@@ -174,6 +182,36 @@ public class UnitRuntimeImpl implements UnitRuntime {
             this.pctxFactory = runtime.kBase.getConfiguration().getComponentFactory().getPropagationContextFactory();
             this.agenda = new UnitAgenda( runtime.kBase, this );
             this.timerService = TimerServiceFactory.getTimerService( config );
+
+            initInitialFact( runtime.kBase );
+            configListeners( runtime );
+        }
+
+        private InternalFactHandle initInitialFact( InternalKnowledgeBase kBase ) {
+            InitialFact initialFact = InitialFactImpl.getInstance();
+            InternalFactHandle handle = new DefaultFactHandle(0, initialFact, 0, null);
+
+            ObjectTypeNode otn = kBase.getRete().getEntryPointNode( EntryPointId.DEFAULT ).getObjectTypeNodes().get( InitialFact_ObjectType );
+            if (otn != null) {
+                PropagationContextFactory ctxFact = kBase.getConfiguration().getComponentFactory().getPropagationContextFactory();
+                PropagationContext pctx = ctxFact.createPropagationContext( 0, PropagationContext.Type.INSERTION, null,
+                        null, handle, EntryPointId.DEFAULT, null );
+                otn.assertInitialFact( handle, pctx, this );
+            }
+
+            return handle;
+        }
+
+        private void configListeners( UnitRuntimeImpl runtime ) {
+            if (runtime.application.config() != null && runtime.application.config().rule() != null) {
+                RuleEventListenerConfig ruleEventListenerConfig = runtime.application.config().rule().ruleEventListeners();
+                ruleEventListenerConfig.agendaListeners().forEach(this::addEventListener);
+                ruleEventListenerConfig.ruleRuntimeListeners().forEach(this::addEventListener);
+            }
+        }
+
+        public Application getApplication() {
+            return runtime.application;
         }
 
         @Override
@@ -413,6 +451,26 @@ public class UnitRuntimeImpl implements UnitRuntime {
         @Override
         public Globals getGlobals() {
             return (Globals) this.getGlobalResolver();
+        }
+
+        @Override
+        public void addEventListener(final RuleRuntimeEventListener listener) {
+            this.ruleRuntimeEventSupport.addEventListener( listener );
+        }
+
+        @Override
+        public void removeEventListener(final RuleRuntimeEventListener listener) {
+            this.ruleRuntimeEventSupport.removeEventListener( listener );
+        }
+
+        @Override
+        public void addEventListener(final AgendaEventListener listener) {
+            this.agendaEventSupport.addEventListener( listener );
+        }
+
+        @Override
+        public void removeEventListener(final AgendaEventListener listener) {
+            this.agendaEventSupport.removeEventListener( listener );
         }
 
         @Override
@@ -993,32 +1051,8 @@ public class UnitRuntimeImpl implements UnitRuntime {
         }
 
         @Override
-        public void addEventListener( RuleRuntimeEventListener listener ) {
-            throw new UnsupportedOperationException( "org.kie.kogito.rules.units.impl.UnitRuntimeImpl.WorkingMemoryAdapter.addEventListener -> TODO" );
-
-        }
-
-        @Override
-        public void removeEventListener( RuleRuntimeEventListener listener ) {
-            throw new UnsupportedOperationException( "org.kie.kogito.rules.units.impl.UnitRuntimeImpl.WorkingMemoryAdapter.removeEventListener -> TODO" );
-
-        }
-
-        @Override
         public Collection<RuleRuntimeEventListener> getRuleRuntimeEventListeners() {
             throw new UnsupportedOperationException( "org.kie.kogito.rules.units.impl.UnitRuntimeImpl.WorkingMemoryAdapter.getRuleRuntimeEventListeners -> TODO" );
-
-        }
-
-        @Override
-        public void addEventListener( AgendaEventListener listener ) {
-            throw new UnsupportedOperationException( "org.kie.kogito.rules.units.impl.UnitRuntimeImpl.WorkingMemoryAdapter.addEventListener -> TODO" );
-
-        }
-
-        @Override
-        public void removeEventListener( AgendaEventListener listener ) {
-            throw new UnsupportedOperationException( "org.kie.kogito.rules.units.impl.UnitRuntimeImpl.WorkingMemoryAdapter.removeEventListener -> TODO" );
 
         }
 

@@ -109,6 +109,7 @@ public class RuleUnitInstanceGenerator implements FileGenerator {
                 MethodCallExpr bindMethod = new MethodCallExpr(new NameExpr("runtime"), "bindUnitField");
                 bindMethod.addArgument( new MethodCallExpr(new NameExpr("value"), methodName) );
                 bindMethod.addArgument( new StringLiteralExpr( propertyName ) );
+                bindMethod.addArgument( new StringLiteralExpr( getEntryPointName(ruleUnitDescription, propertyName) ) );
                 bindMethod.addArgument( new BooleanLiteralExpr( m.isDataSource() ) );
                 methodBlock.addStatement(bindMethod);
             }

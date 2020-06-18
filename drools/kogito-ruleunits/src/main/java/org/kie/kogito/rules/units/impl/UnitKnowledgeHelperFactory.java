@@ -114,6 +114,11 @@ public class UnitKnowledgeHelperFactory implements KnowledgeHelperFactory, Seria
         }
 
         @Override
+        public void run(String ruleUnitName) {
+            ( (UnitRuntimeImpl.WorkingMemoryAdapter) workingMemory).getApplication().ruleUnits().getRegisteredInstance( ruleUnitName ).fire();
+        }
+
+        @Override
         public InternalFactHandle insert( Object object ) {
             throw new UnsupportedOperationException( "org.kie.kogito.rules.units.impl.UnitKnowledgeHelperFactory.UnitKnowledgeHelper.insert -> TODO" );
 

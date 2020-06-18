@@ -67,7 +67,7 @@ public class AbstractRuleUnitInstance<T extends RuleUnitData> implements RuleUni
             for (Field f : unitMemory.getClass().getDeclaredFields()) {
                 f.setAccessible(true);
                 Object value = f.get(unitMemory);
-                runtime.bindUnitField( value, f.getName(), value instanceof DataSource );
+                runtime.bindUnitField( value, f.getName(), f.getName(), value instanceof DataSource );
             }
         } catch (IllegalAccessException e) {
             throw new Error(e);
