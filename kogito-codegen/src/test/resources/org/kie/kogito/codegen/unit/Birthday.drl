@@ -1,0 +1,8 @@
+package org.kie.kogito.codegen.unit;
+unit PersonsUnit;
+
+rule Birthday no-loop when
+    $p: Person( $age : age )
+then
+    modify($p) { setAge($age+1); }
+end

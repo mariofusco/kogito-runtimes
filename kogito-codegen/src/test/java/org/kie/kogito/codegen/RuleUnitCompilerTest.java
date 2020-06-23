@@ -37,6 +37,8 @@ import org.kie.kogito.rules.DataSource;
 import org.kie.kogito.rules.DataStore;
 import org.kie.kogito.rules.RuleUnit;
 import org.kie.kogito.rules.RuleUnitInstance;
+import org.kie.kogito.rules.units.scheduler.UnitScheduler;
+import org.kie.kogito.rules.units.scheduler.UnitWorkflow;
 
 import static java.util.Arrays.asList;
 import static java.util.stream.Collectors.toList;
@@ -269,5 +271,32 @@ public class RuleUnitCompilerTest extends AbstractCodegenTest {
         } catch(RuleCodegenError e) {
             // ignore
         }
+    }
+
+    @Test
+    public void testRuleUnitScheduler() throws Exception {
+        Application application = generateCodeRulesOnly(
+                "org/kie/kogito/codegen/unit/RuleUnit.drl",
+                "org/kie/kogito/codegen/unit/Birthday.drl");
+
+        DataStore<Person> persons = DataSource.createStore();
+        persons.add(new Person( "Mario", 45 ));
+        persons.add(new Person( "Marilena", 17 ));
+        persons.add(new Person( "Sofia", 7 ));
+
+        PersonsUnit personsUnit = new PersonsUnit(persons);
+        AdultUnit adultData18 = new AdultUnit(persons, 18);
+        AdultUnit adultData21 = new AdultUnit(persons, 21);
+
+        UnitScheduler scheduler = new UnitScheduler( application );
+        UnitWorkflow workflow = scheduler.sequential( personsUnit,
+                                                      scheduler.parallel( adultData18, adultData21 ) );
+
+        workflow.execute();
+
+        assertEquals( 2, adultData18.getResults().getResults().size() );
+        assertTrue( adultData18.getResults().getResults().containsAll( asList("Mario", "Marilena") ) );
+        assertEquals( 1, adultData21.getResults().getResults().size() );
+        assertTrue( adultData21.getResults().getResults().containsAll( asList("Mario") ) );
     }
 }
