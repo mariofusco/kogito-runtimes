@@ -114,7 +114,7 @@ public class UnitAgenda
 
     private Map<String, InternalActivationGroup>                 activationGroups;
 
-    private InternalAgendaGroup mainAgendaGroup;
+    private InternalAgendaGroup                                  agendaGroup;
 
     private final org.drools.core.util.LinkedList<RuleAgendaItem> eager = new org.drools.core.util.LinkedList<>();
 
@@ -150,7 +150,7 @@ public class UnitAgenda
 
         // MAIN should always be the first AgendaGroup and can never be
         // removed
-        this.mainAgendaGroup = new AgendaGroupQueueImpl( AgendaGroup.MAIN, kBase );
+        this.agendaGroup = new AgendaGroupQueueImpl( AgendaGroup.MAIN, kBase );
 
         Object object = ComponentsFactory.createConsequenceExceptionHandler( kBase.getConfiguration().getConsequenceExceptionHandler(),
                 kBase.getConfiguration().getClassLoader() );
@@ -166,7 +166,7 @@ public class UnitAgenda
             ClassNotFoundException {
         setWorkingMemory( (InternalWorkingMemory) in.readObject() );
         activationGroups = (Map) in.readObject();
-        mainAgendaGroup = (InternalAgendaGroup) in.readObject();
+        agendaGroup = (InternalAgendaGroup) in.readObject();
         declarativeAgenda = in.readBoolean();
         sequential = in.readBoolean();
         this.executionStateMachine = new ExecutionStateMachine();
@@ -176,7 +176,7 @@ public class UnitAgenda
     public void writeExternal(ObjectOutput out) throws IOException {
         out.writeObject( workingMemory );
         out.writeObject( activationGroups );
-        out.writeObject( mainAgendaGroup );
+        out.writeObject( agendaGroup );
         out.writeBoolean( declarativeAgenda );
         out.writeBoolean( sequential );
     }
@@ -215,7 +215,7 @@ public class UnitAgenda
     @Override
     public void setWorkingMemory(final InternalWorkingMemory workingMemory) {
         this.workingMemory = workingMemory;
-        this.mainAgendaGroup = (InternalAgendaGroup) getAgendaGroup( AgendaGroup.MAIN );
+        this.agendaGroup = (InternalAgendaGroup) getAgendaGroup( AgendaGroup.MAIN );
 
         this.ruleEvaluator = new SequentialRuleEvaluator( this );
         this.propagationList = createPropagationList();
@@ -401,12 +401,12 @@ public class UnitAgenda
 
     @Override
     public RuleAgendaItem peekNextRule() {
-        return (RuleAgendaItem) mainAgendaGroup.peek();
+        return (RuleAgendaItem) agendaGroup.peek();
     }
 
     @Override
     public AgendaGroup getAgendaGroup(final String name) {
-        return name.equals( AgendaGroup.MAIN ) ? mainAgendaGroup : null;
+        return name.equals( AgendaGroup.MAIN ) ? agendaGroup : null;
     }
 
     @Override
@@ -416,7 +416,7 @@ public class UnitAgenda
 
     @Override
     public Map<String, InternalAgendaGroup> getAgendaGroupsMap() {
-        return Collections.singletonMap( AgendaGroup.MAIN, mainAgendaGroup );
+        return Collections.singletonMap( AgendaGroup.MAIN, agendaGroup );
     }
 
     @Override
@@ -485,8 +485,8 @@ public class UnitAgenda
     @Override
     public void clear() {
         // preserve lazy items.
-        mainAgendaGroup.setClearedForRecency( this.workingMemory.getFactHandleFactory().getRecency() );
-        mainAgendaGroup.reset();
+        agendaGroup.setClearedForRecency( this.workingMemory.getFactHandleFactory().getRecency() );
+        agendaGroup.reset();
 
         // reset all activation groups.
         for ( InternalActivationGroup group : this.activationGroups.values() ) {
@@ -498,7 +498,7 @@ public class UnitAgenda
 
     @Override
     public void reset() {
-        mainAgendaGroup.reset();
+        agendaGroup.reset();
 
         // reset all activation groups.
         for ( InternalActivationGroup group : this.activationGroups.values() ) {
@@ -515,7 +515,7 @@ public class UnitAgenda
     @Override
     public void clearAndCancelAgendaGroup(final String name) {
         if ( name.equals( AgendaGroup.MAIN ) ) {
-            clearAndCancelAgendaGroup( mainAgendaGroup );
+            clearAndCancelAgendaGroup( agendaGroup );
         }
     }
 
@@ -644,7 +644,7 @@ public class UnitAgenda
             return 0;
         }
         int count = 0;
-        for ( Activation item : mainAgendaGroup.getActivations() ) {
+        for ( Activation item : agendaGroup.getActivations() ) {
             if (!((RuleAgendaItem) item).getRuleExecutor().getLeftTupleList().isEmpty()) {
                 count = count + ((RuleAgendaItem) item).getRuleExecutor().getLeftTupleList().size();
             }
@@ -805,11 +805,11 @@ public class UnitAgenda
                 }
 
                 evaluateEagerList();
-                if ( !mainAgendaGroup.isEmpty() && !limitReached ) {
+                if ( !agendaGroup.isEmpty() && !limitReached ) {
                     // only fire rules while the limit has not reached.
                     // if halt is called, then isFiring will be false.
                     // The while loop may continue to loop, to keep flushing the action propagation queue
-                    returnedFireCount = ruleEvaluator.evaluateAndFire( agendaFilter, fireCount, fireLimit, mainAgendaGroup );
+                    returnedFireCount = ruleEvaluator.evaluateAndFire( agendaFilter, fireCount, fireLimit, agendaGroup );
                     fireCount += returnedFireCount;
 
                     limitReached = ( fireLimit > 0 && fireCount >= fireLimit );
@@ -818,7 +818,7 @@ public class UnitAgenda
                     returnedFireCount = 0; // no rules fired this iteration, so we know this is 0
                 }
 
-                if ( returnedFireCount == 0 && head == null && mainAgendaGroup.isEmpty() && !flushExpirations() ) {
+                if ( returnedFireCount == 0 && head == null && agendaGroup.isEmpty() && !flushExpirations() ) {
                     // if true, the engine is now considered potentially at rest
                     head = restHandler.handleRest( this, isInternalFire );
                     if (!isInternalFire && head == null) {
@@ -827,9 +827,9 @@ public class UnitAgenda
                 }
             }
 
-            if ( this.mainAgendaGroup.isEmpty() ) {
+            if ( this.agendaGroup.isEmpty() ) {
                 // the root MAIN agenda group is empty, reset active to false, so it can receive more activations.
-                this.mainAgendaGroup.setActive( false );
+                this.agendaGroup.setActive( false );
             }
         } finally {
             // makes sure the engine is inactive, if an exception is thrown.
@@ -1288,12 +1288,12 @@ public class UnitAgenda
 
     @Override
     public int agendaSize() {
-        return mainAgendaGroup.size();
+        return agendaGroup.size();
     }
 
     @Override
     public Activation[] getActivations() {
-        return mainAgendaGroup.getActivations();
+        return agendaGroup.getActivations();
     }
 
     @Override

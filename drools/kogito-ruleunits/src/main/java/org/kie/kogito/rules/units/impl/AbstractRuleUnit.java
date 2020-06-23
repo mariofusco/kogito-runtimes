@@ -31,7 +31,7 @@ public abstract class AbstractRuleUnit<T extends RuleUnitData> implements RuleUn
     protected abstract RuleUnitInstance<T> internalCreateInstance(T data);
 
     @Override
-    public RuleUnitInstance<T> createInstance(T data, String name) {
+    public final RuleUnitInstance<T> createInstance(T data, String name) {
         RuleUnitInstance<T> instance = internalCreateInstance(data);
         app.ruleUnits().register( name, instance );
         return instance;
