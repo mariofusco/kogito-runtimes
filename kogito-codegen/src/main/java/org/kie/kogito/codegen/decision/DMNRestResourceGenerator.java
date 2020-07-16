@@ -67,7 +67,7 @@ public class DMNRestResourceGenerator {
         this.decisionName = CodegenStringUtil.escapeIdentifier(model.getName());
         this.nameURL = URLEncoder.encode(model.getName()).replaceAll("\\+", "%20");
         this.appCanonicalName = appCanonicalName;
-        String classPrefix = StringUtils.capitalize(decisionName);
+        String classPrefix = StringUtils.ucFirst(decisionName);
         this.resourceClazzName = classPrefix + "Resource";
         this.relativePath = packageName.replace(".", "/") + "/" + resourceClazzName + ".java";
     }
